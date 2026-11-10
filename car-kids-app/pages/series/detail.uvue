@@ -1,0 +1,271 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿下排第3张：E级车系详情页） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">{{ seriesNameZh }}</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <view class="card-box series-card">
+        <!-- 顶部主图 -->
+        <image
+          :src="activeHeroUrl"
+          mode="aspectFill"
+          class="series-hero-img"
+        />
+
+        <!-- 车系完整标题与定位（如：奔驰 E级 / 豪华中大型轿车） -->
+        <text class="series-full-title">{{ fullTitle }}</text>
+        <text class="series-body-label">{{ bodyTypeLabel }}</text>
+
+        <!-- 3 张多角度缩略图横向预览（使用 flex-row 替代 grid，兼容 uni-app x） -->
+        <view v-if="galleryList.length > 0" class="angle-gallery">
+          <view
+            v-for="(img, idx) in galleryList"
+            :key="idx"
+            class="angle-thumb-wrap"
+            :class="{ 'angle-thumb-active': selectedImageUrl == (img.getString('url') ?? '') }"
+            @click="selectGalleryImage(img.getString('url') ?? '')"
+          >
+            <image
+              :src="getImgUrl(img.getString('url'))"
+              mode="aspectFill"
+              class="angle-thumb-img"
+            />
+          </view>
+        </view>
+
+        <!-- 儿童版车系简介 -->
+        <view class="series-intro-box">
+          <text class="series-intro-text">{{ introChild }}</text>
+        </view>
+
+        <!-- 具体车型/年款列表（BRAND-006：有数据时展示，无数据时不虚构配置） -->
+        <view v-if="vehiclesList.length > 0" class="vehicle-sub-section">
+          <text class="sub-section-title">具体车型</text>
+          <view
+            v-for="(veh, vIdx) in vehiclesList"
+            :key="vIdx"
+            class="veh-item-card"
+            @click="openVehicleDetail(veh.getNumber('id') ?? 0)"
+          >
+            <view class="veh-left">
+              <view v-if="(veh.getNumber('model_year') ?? 0) > 0" class="year-mini-tag">
+                <text class="year-mini-text">{{ veh.getNumber('model_year') ?? 2024 }}款</text>
+              </view>
+              <text class="veh-name-text">{{ veh.getString('model_name_zh') ?? '' }}</text>
+              <text v-if="(veh.getString('trim_name') ?? '') != ''" class="veh-trim-text">
+                {{ veh.getString('trim_name') ?? '' }}
+              </text>
+            </view>
+            <text class="veh-arrow">查看详情 ›</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { computed, ref } from 'vue';
+import { fetchSeriesDetail } from '../../api/catalog.uts';
+import { resolveImageUrl } from '../../utils/request.uts';
+
+const seriesNameZh = ref<string>('E级');
+const fullTitle = ref<string>('奔驰 E级');
+const bodyTypeLabel = ref<string>('豪华中大型轿车');
+const introChild = ref<string>('奔驰E级是一款豪华商务轿车，兼顾舒适与性能。');
+const coverImageUrl = ref<string>('');
+const selectedImageUrl = ref<string>('');
+const galleryList = ref<Array<UTSJSONObject>>([]);
+const vehiclesList = ref<Array<UTSJSONObject>>([]);
+
+const activeHeroUrl = computed((): string => {
+  const target = selectedImageUrl.value != '' ? selectedImageUrl.value : coverImageUrl.value;
+  return resolveImageUrl(target);
+});
+
+onLoad((query: OnLoadOptions) => {
+  const id = parseInt(query['id'] ?? '0');
+  if (id <= 0) return;
+  fetchSeriesDetail(id).then((detail: UTSJSONObject) => {
+    seriesNameZh.value = detail.getString('name_zh') ?? '车系详情';
+    fullTitle.value = detail.getString('full_title') ?? seriesNameZh.value;
+    bodyTypeLabel.value = detail.getString('body_type_label') ?? '豪华中大型轿车';
+    introChild.value = detail.getString('introduction_child') ?? '';
+    coverImageUrl.value = detail.getString('cover_image_url') ?? '';
+    selectedImageUrl.value = coverImageUrl.value;
+    galleryList.value = detail.getArray<UTSJSONObject>('gallery') ?? ([] as Array<UTSJSONObject>);
+    vehiclesList.value = detail.getArray<UTSJSONObject>('vehicles') ?? ([] as Array<UTSJSONObject>);
+  });
+});
+
+function getImgUrl(url: string | null): string {
+  return resolveImageUrl(url);
+}
+
+function selectGalleryImage(url: string) {
+  selectedImageUrl.value = url;
+}
+
+function openVehicleDetail(vehicleId: number) {
+  if (vehicleId <= 0) return;
+  uni.navigateTo({ url: `/pages/vehicle/detail?id=${vehicleId}` });
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: `儿童汽车认知 - ${fullTitle.value}`,
+    path: '/pages/catalog/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: `儿童汽车认知 - ${fullTitle.value}`,
+  };
+});
+</script>
+
+<style scoped>
+.series-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.series-hero-img {
+  width: 100%;
+  height: 380rpx;
+  border-radius: 28rpx;
+  background-color: #e2e8f0;
+}
+
+.series-full-title {
+  margin-top: 28rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.series-body-label {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.angle-gallery {
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.angle-thumb-wrap {
+  width: 31%;
+  height: 136rpx;
+  border-radius: 18rpx;
+  overflow: hidden;
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: transparent;
+}
+
+.angle-thumb-active {
+  border-color: #2563eb;
+}
+
+.angle-thumb-img {
+  width: 100%;
+  height: 100%;
+}
+
+.series-intro-box {
+  margin-top: 28rpx;
+  background-color: #f8fafc;
+  border-radius: 22rpx;
+  padding: 24rpx;
+}
+
+.series-intro-text {
+  font-size: 30rpx;
+  line-height: 46rpx;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.vehicle-sub-section {
+  margin-top: 32rpx;
+  border-top-width: 2rpx;
+  border-top-style: solid;
+  border-top-color: #e2e8f0;
+  padding-top: 24rpx;
+}
+
+.sub-section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 16rpx;
+}
+
+.veh-item-card {
+  background-color: #f0f7ff;
+  border-radius: 22rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.veh-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.year-mini-tag {
+  background-color: #3b82f6;
+  padding: 4rpx 16rpx;
+  border-radius: 16rpx;
+  margin-right: 12rpx;
+}
+
+.year-mini-text {
+  font-size: 22rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.veh-name-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-right: 12rpx;
+}
+
+.veh-trim-text {
+  font-size: 26rpx;
+  color: #475569;
+}
+
+.veh-arrow {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+</style>

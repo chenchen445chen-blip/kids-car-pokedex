@@ -1,0 +1,256 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿上排第2张：拍照识车） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">拍照识车</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <!-- 取景框与预览大图区域（REC-004 提示 + 四角白色取景框） -->
+      <view class="viewfinder-card">
+        <image
+          v-if="selectedImagePath != ''"
+          :src="selectedImagePath"
+          mode="aspectFill"
+          class="preview-image"
+        />
+        <view v-else class="placeholder-stage">
+          <text class="stage-car-emoji">🚘</text>
+          <text class="stage-tip-main">对准汽车拍一张吧</text>
+          <text class="stage-tip-sub">请拍摄完整车身 · 光线充足 · 避免遮挡</text>
+        </view>
+      </view>
+
+      <!-- 快捷联调场景选择（便于测试命中车型 / 车系级识别 / 新车待审核入库） -->
+      <view class="scene-selector">
+        <view
+          v-for="(item, idx) in testModes"
+          :key="idx"
+          class="scene-chip"
+          :class="{ 'scene-chip-active': currentHint == item.getString('value') }"
+          @click="selectMode(item.getString('value') ?? 'bmw_3')"
+        >
+          <text
+            class="scene-chip-text"
+            :class="{ 'scene-chip-text-active': currentHint == item.getString('value') }"
+          >
+            {{ item.getString('label') ?? '' }}
+          </text>
+        </view>
+      </view>
+
+      <!-- 底部拍照与相册大圆按钮（还原设计稿上排第2张） -->
+      <view class="capture-actions">
+        <view class="action-item" @click="chooseAndRecognize('camera')">
+          <view class="circle-btn circle-blue">
+            <text class="circle-icon">📷</text>
+          </view>
+          <text class="circle-label">拍照</text>
+        </view>
+
+        <view class="action-item" @click="chooseAndRecognize('album')">
+          <view class="circle-btn circle-green">
+            <text class="circle-icon">🖼️</text>
+          </view>
+          <text class="circle-label">相册</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue';
+import { cacheRecognitionResult, uploadRecognitionImage } from '../../utils/request.uts';
+
+const selectedImagePath = ref<string>('');
+const currentHint = ref<string>('bmw_3');
+
+const testModes: Array<UTSJSONObject> = [
+  { label: '宝马3系(命中车型)', value: 'bmw_3' },
+  { label: '奔驰E级(命中车系)', value: 'e级' },
+  { label: '新车型(待审核)', value: 'su7' },
+];
+
+function selectMode(val: string) {
+  currentHint.value = val;
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+function chooseAndRecognize(sourceType: string) {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: [sourceType],
+    success: (chooseRes) => {
+      const paths = chooseRes.tempFilePaths;
+      if (paths.length == 0) return;
+      const filePath = paths[0];
+      selectedImagePath.value = filePath;
+
+      uni.showLoading({ title: '正在认识这辆车...' });
+      const reqId = `req_${Date.now()}`;
+      uploadRecognitionImage(filePath, reqId, currentHint.value)
+        .then((outcome: UTSJSONObject) => {
+          uni.hideLoading();
+          outcome.set('local_preview_path', filePath);
+          cacheRecognitionResult(outcome);
+          const status = outcome.getString('status') ?? '';
+          if (status == 'pending_review') {
+            uni.navigateTo({ url: '/pages/recognition/pending' });
+          } else {
+            uni.navigateTo({ url: '/pages/recognition/result' });
+          }
+        })
+        .catch(() => {
+          uni.hideLoading();
+        });
+    },
+  });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: '儿童汽车认知 - 拍照识车',
+    path: '/pages/recognition/camera',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: '儿童汽车认知 - 拍照识车',
+  };
+});
+</script>
+
+<style scoped>
+.viewfinder-card {
+  width: 100%;
+  height: 640rpx;
+  border-radius: 44rpx;
+  background-color: #1e293b;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12rpx;
+  border-width: 6rpx;
+  border-style: solid;
+  border-color: #ffffff;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+}
+
+.placeholder-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40rpx;
+}
+
+.stage-car-emoji {
+  font-size: 128rpx;
+  margin-bottom: 24rpx;
+}
+
+.stage-tip-main {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 14rpx;
+}
+
+.stage-tip-sub {
+  font-size: 26rpx;
+  color: #cbd5e1;
+  text-align: center;
+}
+
+.scene-selector {
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.scene-chip {
+  padding: 10rpx 20rpx;
+  border-radius: 24rpx;
+  background-color: rgba(255, 255, 255, 0.85);
+  margin-right: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.scene-chip-active {
+  background-color: #2563eb;
+}
+
+.scene-chip-text {
+  font-size: 24rpx;
+  color: #334155;
+  font-weight: 700;
+}
+
+.scene-chip-text-active {
+  color: #ffffff;
+}
+
+.capture-actions {
+  padding: 48rpx 64rpx 28rpx 64rpx;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.circle-btn {
+  width: 152rpx;
+  height: 152rpx;
+  border-radius: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 6rpx;
+  border-style: solid;
+  border-color: #ffffff;
+}
+
+.circle-blue {
+  background-image: linear-gradient(to bottom, #3b9eff, #1d7dfa);
+}
+
+.circle-green {
+  background-image: linear-gradient(to bottom, #4ade80, #22c55e);
+}
+
+.circle-icon {
+  font-size: 64rpx;
+}
+
+.circle-label {
+  margin-top: 16rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+</style>

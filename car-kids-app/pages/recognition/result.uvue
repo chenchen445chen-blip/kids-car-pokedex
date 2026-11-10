@@ -1,0 +1,314 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿上排第3张：识别结果） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">识别结果</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <!-- 命中具体车型或车系展示卡片 -->
+      <view v-if="status == 'matched'" class="card-box result-card">
+        <image
+          :src="displayCoverUrl"
+          mode="aspectFill"
+          class="result-car-photo"
+        />
+
+        <!-- 品牌车标 + 品牌名 + 车系/车型名（如：宝马 / 3系） -->
+        <view class="brand-header">
+          <view class="brand-logo-wrap">
+            <image
+              v-if="brandLogoUrl != ''"
+              :src="brandLogoUrl"
+              mode="aspectFit"
+              class="brand-logo-img"
+            />
+            <text v-else class="brand-logo-fallback">🛡️</text>
+          </view>
+          <view class="brand-titles">
+            <text class="brand-main-name">{{ brandName }}</text>
+            <text class="series-sub-name">{{ seriesOrModelName }}</text>
+          </view>
+        </view>
+
+        <!-- 车辆类型胶囊标签（如：家用车 · 轿车） -->
+        <view class="category-pill">
+          <text class="category-pill-text">{{ categoryLabelText }}</text>
+        </view>
+
+        <!-- 灯泡儿童知识介绍卡片（如：💡 宝马3系是一款受欢迎的豪华轿车。） -->
+        <view class="tip-bulb-card" style="width: 100%; margin-top: 28rpx">
+          <text class="tip-bulb-icon">💡</text>
+          <text class="tip-bulb-text">{{ introChild }}</text>
+        </view>
+
+        <!-- 底部蓝色胶囊按钮：查看更多 -->
+        <view class="primary-pill-btn" style="width: 100%; margin-top: 36rpx" @click="goMoreDetail">
+          <text class="primary-pill-btn-text">查看更多</text>
+        </view>
+      </view>
+
+      <!-- 多候选结果（candidates） -->
+      <view v-else-if="status == 'candidates'" class="card-box">
+        <text class="candidate-title">{{ childMessage }}</text>
+        <view
+          v-for="(cand, idx) in candidatesList"
+          :key="idx"
+          class="candidate-item"
+          @click="goCandidateVehicle(cand.getNumber('vehicle_id') ?? 0)"
+        >
+          <image
+            :src="getImgUrl(cand.getString('cover_image_url'))"
+            mode="aspectFill"
+            class="candidate-thumb"
+          />
+          <text class="candidate-name">{{ cand.getString('model_name') ?? '' }}</text>
+          <text class="candidate-arrow">›</text>
+        </view>
+      </view>
+
+      <!-- 未识别或服务异常温和提示 -->
+      <view v-else class="card-box unrecognized-box">
+        <text class="unrec-emoji">🔍</text>
+        <text class="unrec-title">还没有认出这辆车哦</text>
+        <text class="unrec-desc">{{ childMessage }}</text>
+        <view class="primary-pill-btn" style="width: 100%; margin-top: 36rpx" @click="goBack">
+          <text class="primary-pill-btn-text">换个角度再拍一次</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue';
+import { getCachedRecognitionResult, resolveImageUrl } from '../../utils/request.uts';
+
+const status = ref<string>('matched');
+const matchLevel = ref<string>('vehicle');
+const displayCoverUrl = ref<string>('');
+const brandLogoUrl = ref<string>('');
+const brandName = ref<string>('宝马');
+const seriesOrModelName = ref<string>('3系');
+const categoryLabelText = ref<string>('家用车 · 轿车');
+const introChild = ref<string>('宝马3系是一款受欢迎的豪华轿车。');
+const childMessage = ref<string>('这辆车还不认识，我们换个角度再拍一次吧。');
+const matchedVehicleId = ref<number>(0);
+const matchedSeriesId = ref<number>(0);
+const candidatesList = ref<Array<UTSJSONObject>>([]);
+
+onLoad(() => {
+  const cached = getCachedRecognitionResult();
+  status.value = cached.getString('status') ?? 'matched';
+  matchLevel.value = cached.getString('match_level') ?? 'vehicle';
+  childMessage.value = cached.getString('child_message') ?? '这辆车还不认识，我们换个角度再拍一次吧。';
+
+  const vehicleObj = cached.getJSON('vehicle');
+  const seriesObj = cached.getJSON('series');
+  if (vehicleObj != null) {
+    matchedVehicleId.value = vehicleObj.getNumber('id') ?? 0;
+    matchedSeriesId.value = vehicleObj.getNumber('series_id') ?? (seriesObj?.getNumber('id') ?? 0);
+    brandName.value = vehicleObj.getString('brand_name') ?? '宝马';
+    seriesOrModelName.value = vehicleObj.getString('series_name') ?? vehicleObj.getString('model_name') ?? '3系';
+    introChild.value = vehicleObj.getString('introduction_child') ?? '这是一辆常见的汽车。';
+    const srvCover = resolveImageUrl(vehicleObj.getString('cover_image_url'));
+    displayCoverUrl.value = srvCover != '' ? srvCover : (cached.getString('local_preview_path') ?? '');
+    brandLogoUrl.value = resolveImageUrl(vehicleObj.getString('brand_logo_url'));
+
+    const catsArr = vehicleObj.getArray<string>('categories');
+    if (catsArr != null && catsArr.length > 0) {
+      categoryLabelText.value = catsArr.join(' · ');
+    }
+  }
+
+  const cands = cached.getArray<UTSJSONObject>('candidates');
+  if (cands != null) {
+    candidatesList.value = cands;
+  }
+});
+
+function getImgUrl(url: string | null): string {
+  return resolveImageUrl(url);
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+function goMoreDetail() {
+  if (matchLevel.value == 'series' && matchedSeriesId.value > 0) {
+    uni.navigateTo({ url: `/pages/series/detail?id=${matchedSeriesId.value}` });
+    return;
+  }
+  if (matchedVehicleId.value > 0) {
+    uni.navigateTo({ url: `/pages/vehicle/detail?id=${matchedVehicleId.value}` });
+  } else if (matchedSeriesId.value > 0) {
+    uni.navigateTo({ url: `/pages/series/detail?id=${matchedSeriesId.value}` });
+  }
+}
+
+function goCandidateVehicle(vehicleId: number) {
+  if (vehicleId <= 0) return;
+  uni.navigateTo({ url: `/pages/vehicle/detail?id=${vehicleId}` });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: `儿童汽车认知 - 我认出了 ${brandName.value} ${seriesTitle.value}`,
+    path: '/pages/index/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: `儿童汽车认知 - 我认出了 ${brandName.value} ${seriesTitle.value}`,
+  };
+});
+</script>
+
+<style scoped>
+.result-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.result-car-photo {
+  width: 100%;
+  height: 380rpx;
+  border-radius: 28rpx;
+  background-color: #e2e8f0;
+}
+
+.brand-header {
+  margin-top: 32rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-logo-wrap {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 56rpx;
+  background-color: #f8fafc;
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 24rpx;
+  overflow: hidden;
+}
+
+.brand-logo-img {
+  width: 88rpx;
+  height: 88rpx;
+}
+
+.brand-logo-fallback {
+  font-size: 56rpx;
+}
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-main-name {
+  font-size: 46rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.series-sub-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #334155;
+  margin-top: 4rpx;
+}
+
+.category-pill {
+  margin-top: 24rpx;
+  background-color: #dbeafe;
+  padding: 12rpx 36rpx;
+  border-radius: 32rpx;
+}
+
+.category-pill-text {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.candidate-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24rpx;
+}
+
+.candidate-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom-width: 2rpx;
+  border-bottom-style: solid;
+  border-bottom-color: #f1f5f9;
+}
+
+.candidate-thumb {
+  width: 140rpx;
+  height: 100rpx;
+  border-radius: 16rpx;
+  margin-right: 24rpx;
+}
+
+.candidate-name {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.candidate-arrow {
+  font-size: 40rpx;
+  color: #94a3b8;
+}
+
+.unrecognized-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56rpx 36rpx;
+}
+
+.unrec-emoji {
+  font-size: 108rpx;
+  margin-bottom: 20rpx;
+}
+
+.unrec-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 16rpx;
+}
+
+.unrec-desc {
+  font-size: 30rpx;
+  color: #475569;
+  text-align: center;
+  line-height: 46rpx;
+}
+</style>

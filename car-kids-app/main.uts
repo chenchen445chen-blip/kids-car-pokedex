@@ -1,0 +1,23 @@
+import App from './App.uvue';
+import { createSSRApp } from 'vue';
+
+export function createApp() {
+  const app = createSSRApp(App);
+  app.mixin({
+    onShareAppMessage(): UTSJSONObject {
+      return {
+        title: '儿童汽车认知乐园 - 带宝宝一起认识身边的汽车！',
+        path: '/pages/index/index',
+      };
+    },
+    onShareTimeline(): UTSJSONObject {
+      return {
+        title: '儿童汽车认知乐园 - 带宝宝一起认识身边的汽车！',
+      };
+    },
+  });
+  return {
+    app,
+  };
+}
+

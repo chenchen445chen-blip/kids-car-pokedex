@@ -1,0 +1,185 @@
+const DEFAULT_SERVER_BASE_URL = 'http://127.0.0.1:8088';
+const LOCAL_DEVTOOLS_BASE_URL = 'http://127.0.0.1:8088';
+const STORAGE_KEY_SERVER_URL = 'car_kids_server_base_url';
+const STORAGE_KEY_RECENT_VEHICLES = 'car_kids_recent_vehicles';
+const STORAGE_KEY_LAST_RECOGNITION = 'car_kids_last_recognition_result';
+
+export function getServerBaseUrl(): string {
+  // 微信开发者工具模拟器运行在本机 Mac 上，直接走本机回环地址，毫秒级秒开图片；真机预览走 Cloudflare HTTPS 隧道
+  if (uni.getSystemInfoSync().platform == 'devtools') {
+    return LOCAL_DEVTOOLS_BASE_URL;
+  }
+  const saved = uni.getStorageSync(STORAGE_KEY_SERVER_URL);
+  if (typeof saved === 'string' && saved.trim().length > 0) {
+    const trimmed = saved.trim();
+    const isStalePort = trimmed.includes(':8000') || trimmed.includes('172.16.');
+    if (!isStalePort) {
+      return trimmed;
+    }
+  }
+  return DEFAULT_SERVER_BASE_URL;
+}
+
+export function setServerBaseUrl(url: string): void {
+  const cleaned = url.trim();
+  uni.setStorageSync(STORAGE_KEY_SERVER_URL, cleaned);
+}
+
+export function resolveImageUrl(relativeOrFullUrl: string | null): string {
+  if (relativeOrFullUrl == null || relativeOrFullUrl == '') {
+    return '';
+  }
+  if (relativeOrFullUrl.startsWith('http://') || relativeOrFullUrl.startsWith('https://')) {
+    return relativeOrFullUrl;
+  }
+  const base = getServerBaseUrl();
+  const path = relativeOrFullUrl.startsWith('/') ? relativeOrFullUrl : `/${relativeOrFullUrl}`;
+  return `${base}${path}`;
+}
+
+function buildUrlWithQuery(baseUrl: string, params: UTSJSONObject | null): string {
+  if (params == null) {
+    return baseUrl;
+  }
+  const pairs: Array<string> = [];
+  params.toMap().forEach((val, key) => {
+    if (val != null && `${val}` != '') {
+      pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(`${val}`)}`);
+    }
+  });
+  if (pairs.length == 0) {
+    return baseUrl;
+  }
+  const sep = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${sep}${pairs.join('&')}`;
+}
+
+function parseSafeJsonObject(raw: any | null): UTSJSONObject {
+  if (raw == null) {
+    return {} as UTSJSONObject;
+  }
+  if (raw instanceof UTSJSONObject) {
+    return raw as UTSJSONObject;
+  }
+  if (typeof raw === 'string') {
+    return JSON.parseObject(raw as string) ?? ({} as UTSJSONObject);
+  }
+  return {} as UTSJSONObject;
+}
+
+export function requestApi(
+  path: string,
+  method: string = 'GET',
+  data: UTSJSONObject | null = null,
+): Promise<UTSJSONObject> {
+  const rawUrl = `${getServerBaseUrl()}${path}`;
+  const finalUrl = method == 'GET' ? buildUrlWithQuery(rawUrl, data) : rawUrl;
+
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: finalUrl,
+      method: method,
+      data: method == 'GET' ? null : data,
+      timeout: 15000,
+      success: (res) => {
+        const body = parseSafeJsonObject(res.data);
+        const code = body.getNumber('code') ?? -1;
+        if (res.statusCode >= 200 && res.statusCode < 300 && (code == 0 || code == 200)) {
+          const payload = body.getJSON('data') ?? ({} as UTSJSONObject);
+          resolve(payload);
+        } else {
+          const msg = body.getString('message') ?? '请确认 Mac 后端服务已启动';
+          uni.showToast({ title: msg, icon: 'none' });
+          reject(new Error(msg));
+        }
+      },
+      fail: (err) => {
+        uni.showToast({ title: '无法连接 Mac 汽车图鉴服务', icon: 'none' });
+        reject(new Error(err.errMsg));
+      },
+    });
+  });
+}
+
+export function uploadRecognitionImage(
+  filePath: string,
+  clientRequestId: string,
+  hintKeyword: string = '',
+): Promise<UTSJSONObject> {
+  const url = `${getServerBaseUrl()}/api/v1/recognition`;
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: url,
+      filePath: filePath,
+      name: 'image',
+      formData: {
+        language: 'zh-CN',
+        client_request_id: clientRequestId,
+        hint_keyword: hintKeyword,
+      },
+      timeout: 20000,
+      success: (uploadRes) => {
+        const parsed = JSON.parseObject(uploadRes.data) ?? ({} as UTSJSONObject);
+        const code = parsed.getNumber('code') ?? -1;
+        if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300 && code == 0) {
+          const payload = parsed.getJSON('data') ?? ({} as UTSJSONObject);
+          resolve(payload);
+        } else {
+          const msg = parsed.getString('message') ?? '图片未能识别，换个角度再拍一次吧';
+          uni.showToast({ title: msg, icon: 'none' });
+          reject(new Error(msg));
+        }
+      },
+      fail: (err) => {
+        uni.showToast({ title: '上传图片失败，请检查网络连接', icon: 'none' });
+        reject(new Error(err.errMsg));
+      },
+    });
+  });
+}
+
+export function saveRecentVehicle(vehicle: UTSJSONObject): void {
+  const vid = vehicle.getNumber('id') ?? 0;
+  if (vid == 0) return;
+  const brandObj = vehicle.getJSON('brand');
+  const item: UTSJSONObject = {
+    id: vid,
+    model_name_zh: vehicle.getString('model_name_zh') ?? vehicle.getString('model_name') ?? '汽车',
+    brand_name_zh: brandObj?.getString('name_zh') ?? '',
+    cover_image_url: vehicle.getString('cover_image_url') ?? '',
+  };
+  const existing = getRecentVehicles();
+  const nextList: Array<UTSJSONObject> = [item];
+  for (let i = 0; i < existing.length; i++) {
+    const cur = existing[i];
+    if ((cur.getNumber('id') ?? 0) != vid && nextList.length < 6) {
+      nextList.push(cur);
+    }
+  }
+  uni.setStorageSync(STORAGE_KEY_RECENT_VEHICLES, JSON.stringify(nextList));
+}
+
+export function getRecentVehicles(): Array<UTSJSONObject> {
+  const raw = uni.getStorageSync(STORAGE_KEY_RECENT_VEHICLES);
+  if (typeof raw === 'string' && raw.length > 0) {
+    const arr = JSON.parseArray<UTSJSONObject>(raw);
+    return arr ?? ([] as Array<UTSJSONObject>);
+  }
+  return [] as Array<UTSJSONObject>;
+}
+
+export function clearRecentVehicles(): void {
+  uni.removeStorageSync(STORAGE_KEY_RECENT_VEHICLES);
+}
+
+export function cacheRecognitionResult(result: UTSJSONObject): void {
+  uni.setStorageSync(STORAGE_KEY_LAST_RECOGNITION, JSON.stringify(result));
+}
+
+export function getCachedRecognitionResult(): UTSJSONObject {
+  const raw = uni.getStorageSync(STORAGE_KEY_LAST_RECOGNITION);
+  if (typeof raw === 'string' && raw.length > 0) {
+    return JSON.parseObject(raw) ?? ({} as UTSJSONObject);
+  }
+  return {} as UTSJSONObject;
+}

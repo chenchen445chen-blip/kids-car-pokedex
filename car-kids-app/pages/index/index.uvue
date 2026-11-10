@@ -1,0 +1,130 @@
+<template>
+  <view class="home-container">
+    <!-- 全屏高清背景插画层（941x2036 全屏无压缩比例，横向纵向 100% 完整展示） -->
+    <image src="/static/home/home_bg_full.jpg" mode="scaleToFill" class="home-bg-image" />
+
+    <!-- 前景交互按钮层（严格还原《儿童汽车认知乐园.png》比例与位置） -->
+    <view class="home-foreground">
+      <!-- 底部三大核心交互按钮区（紧贴男孩与公路下沿 46.2% 处） -->
+      <view class="actions-area">
+        <!-- 1. 拍照识车按钮 -->
+        <view class="main-pill-btn" hover-class="pill-btn-hover" @click="goRecognition">
+          <image src="/static/home/btn_camera.png" mode="aspectFit" class="main-pill-img" />
+        </view>
+
+        <!-- 2. 汽车图鉴按钮 -->
+        <view class="main-pill-btn catalog-btn-gap" hover-class="pill-btn-hover" @click="goCatalog">
+          <image src="/static/home/btn_catalog.png" mode="aspectFit" class="main-pill-img" />
+        </view>
+
+        <!-- 3. 家长设置按钮 -->
+        <view class="settings-pill-btn" hover-class="pill-btn-hover" @click="goParentSettings">
+          <image src="/static/home/btn_settings.png" mode="aspectFit" class="settings-pill-img" />
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+function goRecognition() {
+  uni.navigateTo({ url: "/pages/recognition/camera" });
+}
+
+function goCatalog() {
+  uni.navigateTo({ url: "/pages/catalog/index" });
+}
+
+function goParentSettings() {
+  uni.navigateTo({ url: "/pages/parent/settings" });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: "儿童汽车认知乐园 - 带宝宝一起认识身边的汽车！",
+    path: "/pages/index/index",
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: "儿童汽车认知乐园 - 带宝宝一起认识身边的汽车！",
+  };
+});
+</script>
+
+<style scoped>
+.home-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: #369eff;
+}
+
+.home-bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.home-foreground {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.actions-area {
+  position: absolute;
+  top: 46.2%;
+  left: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main-pill-btn {
+  width: 660rpx;
+  height: 205rpx;
+  border-radius: 103rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-btn-gap {
+  margin-top: 40rpx;
+}
+
+.main-pill-img {
+  width: 660rpx;
+  height: 205rpx;
+}
+
+.settings-pill-btn {
+  margin-top: 68rpx;
+  width: 314rpx;
+  height: 103rpx;
+  border-radius: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-pill-img {
+  width: 314rpx;
+  height: 103rpx;
+}
+
+.pill-btn-hover {
+  opacity: 0.9;
+  transform: scale(0.97);
+}
+</style>

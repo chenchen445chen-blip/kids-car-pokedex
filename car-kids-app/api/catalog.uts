@@ -1,0 +1,37 @@
+import { requestApi } from '../utils/request.uts';
+
+export function fetchHealth(): Promise<UTSJSONObject> {
+  return requestApi('/api/v1/health', 'GET', null);
+}
+
+export function fetchCategories(params: UTSJSONObject | null = null): Promise<UTSJSONObject> {
+  return requestApi('/api/v1/categories', 'GET', params);
+}
+
+export function fetchBrands(params: UTSJSONObject | null = null): Promise<UTSJSONObject> {
+  return requestApi('/api/v1/brands', 'GET', params);
+}
+
+export function fetchBrandDetail(brandId: number): Promise<UTSJSONObject> {
+  return requestApi(`/api/v1/brands/${brandId}`, 'GET', null);
+}
+
+export function fetchBrandSeries(brandId: number, params: UTSJSONObject | null = null): Promise<UTSJSONObject> {
+  return requestApi(`/api/v1/brands/${brandId}/series`, 'GET', params);
+}
+
+export function fetchSeriesDetail(seriesId: number): Promise<UTSJSONObject> {
+  return requestApi(`/api/v1/series/${seriesId}`, 'GET', null);
+}
+
+export function fetchVehicles(params: UTSJSONObject | null = null): Promise<UTSJSONObject> {
+  return requestApi('/api/v1/vehicles', 'GET', params);
+}
+
+export function fetchRandomVehicles(params: UTSJSONObject | null = null): Promise<UTSJSONObject> {
+  return requestApi('/api/v1/vehicles/random', 'GET', params);
+}
+
+export function fetchVehicleDetail(vehicleId: number): Promise<UTSJSONObject> {
+  return requestApi(`/api/v1/vehicles/${vehicleId}`, 'GET', null);
+}

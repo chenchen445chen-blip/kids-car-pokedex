@@ -1,0 +1,175 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿上排第5张：工程车双列网格） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">{{ categoryName }}</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <!-- 双列车辆卡片网格（使用 flex-wrap 替代 grid，兼容 uni-app x） -->
+      <view v-if="vehicleList.length > 0" class="vehicle-grid">
+        <view
+          v-for="(item, idx) in vehicleList"
+          :key="idx"
+          class="vehicle-grid-card"
+          @click="openVehicleDetail(item.getNumber('id') ?? 0)"
+        >
+          <view class="vehicle-img-wrap">
+            <image
+              :src="getImgUrl(item.getString('cover_image_url'))"
+              mode="aspectFill"
+              :lazy-load="true"
+              class="vehicle-cover-img"
+            />
+            <!-- 模型图明确标记（CAT-005） -->
+            <view v-if="item.getBoolean('is_model_image') == true" class="model-badge">
+              <text class="model-badge-text">仿真模型</text>
+            </view>
+          </view>
+          <text class="vehicle-card-title">{{ item.getString('model_name_zh') ?? '' }}</text>
+        </view>
+      </view>
+
+      <view v-else class="card-box empty-state">
+        <text class="empty-emoji">🚜</text>
+        <text class="empty-text">该分类下的汽车正在整理中哦</text>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue';
+import { fetchVehicles } from '../../api/catalog.uts';
+import { resolveImageUrl } from '../../utils/request.uts';
+
+const categoryId = ref<number>(0);
+const categoryName = ref<string>('工程车');
+const vehicleList = ref<Array<UTSJSONObject>>([]);
+
+onLoad((query: OnLoadOptions) => {
+  const idStr = query['id'] ?? '0';
+  categoryId.value = parseInt(idStr);
+  const nameStr = query['name'] ?? '';
+  if (nameStr != '') {
+    categoryName.value = decodeURIComponent(nameStr) ?? '工程车';
+  }
+  const params: UTSJSONObject =
+    categoryId.value > 0
+      ? { category_id: categoryId.value, page: 1, page_size: 50 }
+      : { page: 1, page_size: 50 };
+  fetchVehicles(params).then((res: UTSJSONObject) => {
+    vehicleList.value = res.getArray<UTSJSONObject>('items') ?? ([] as Array<UTSJSONObject>);
+  });
+});
+
+function getImgUrl(url: string | null): string {
+  return resolveImageUrl(url);
+}
+
+function openVehicleDetail(vehicleId: number) {
+  if (vehicleId <= 0) return;
+  uni.navigateTo({ url: `/pages/vehicle/detail?id=${vehicleId}` });
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: `儿童汽车认知 - ${categoryName.value}图鉴`,
+    path: `/pages/catalog/category-vehicles?id=${categoryId.value}&name=${encodeURIComponent(categoryName.value)}`,
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: `儿童汽车认知 - ${categoryName.value}图鉴`,
+  };
+});
+</script>
+
+<style scoped>
+.vehicle-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 8rpx;
+}
+
+.vehicle-grid-card {
+  width: 48%;
+  background-color: #ffffff;
+  border-radius: 32rpx;
+  padding: 20rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vehicle-img-wrap {
+  width: 100%;
+  height: 220rpx;
+  border-radius: 22rpx;
+  overflow: hidden;
+  position: relative;
+  background-color: #f1f5f9;
+}
+
+.vehicle-cover-img {
+  width: 100%;
+  height: 100%;
+}
+
+.model-badge {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  background-color: rgba(15, 23, 42, 0.75);
+  padding: 6rpx 16rpx;
+  border-radius: 16rpx;
+}
+
+.model-badge-text {
+  font-size: 22rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.vehicle-card-title {
+  margin-top: 18rpx;
+  margin-bottom: 6rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.empty-state {
+  margin-top: 60rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 32rpx;
+}
+
+.empty-emoji {
+  font-size: 96rpx;
+  margin-bottom: 20rpx;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #64748b;
+  font-weight: 700;
+}
+</style>

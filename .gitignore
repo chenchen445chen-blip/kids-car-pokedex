@@ -1,0 +1,31 @@
+# Only track car-kids-app and car-kids-server in this repository
+/car-image-crawler/
+/cloudflared/
+/qietu/
+/help/
+/*.png
+/*.jpg
+/*.txt
+/*.docx
+
+# Subproject build/runtime/storage directories
+car-kids-app/unpackage/
+car-kids-app/.hbuilderx/
+car-kids-app/node_modules/
+car-kids-server/storage/
+car-kids-server/data/*.db*
+car-kids-server/data/backups/
+car-kids-server/.venv/
+car-kids-server/venv/
+
+# Python & OS files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!car-kids-server/.env.example
+.DS_Store
+*.log
+.idea/
+.vscode/

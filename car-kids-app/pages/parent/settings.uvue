@@ -1,0 +1,129 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏：家长设置（需求文档 3.4 节） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">家长设置</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <!-- 隐私与儿童保护说明 -->
+      <view class="card-box setting-card">
+        <text class="section-title">🛡️ 儿童隐私保护说明</text>
+        <text class="privacy-item">• 本应用面向 3—5 岁儿童，不要求注册儿童账号，不采集姓名、生日、学校或位置信息。</text>
+        <text class="privacy-item">• 拍照识车图片仅用于当次车辆识别，服务端默认不在磁盘长期保存您拍摄的原图。</text>
+        <text class="privacy-item">• 所有图鉴车辆、车标与儿童版介绍均经过人工审核，未审核内容不会向儿童展示。</text>
+      </view>
+
+      <!-- 本机浏览历史管理 -->
+      <view class="card-box setting-card">
+        <text class="section-title">🧹 本机记录管理</text>
+        <view class="small-btn btn-danger" @click="handleClearHistory">
+          <text class="small-btn-text">清除本机最近浏览记录</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { clearRecentVehicles } from '../../utils/request.uts';
+
+function handleClearHistory() {
+  clearRecentVehicles();
+  uni.showToast({ title: '已清除本机浏览记录', icon: 'success' });
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: '儿童汽车认知乐园',
+    path: '/pages/index/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: '儿童汽车认知乐园',
+  };
+});
+</script>
+
+<style scoped>
+.setting-card {
+  margin-bottom: 28rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 18rpx;
+}
+
+.privacy-item {
+  font-size: 28rpx;
+  color: #475569;
+  line-height: 44rpx;
+  margin-bottom: 10rpx;
+}
+
+.server-input {
+  height: 84rpx;
+  background-color: #f8fafc;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #cbd5e1;
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  color: #0f172a;
+}
+
+.btn-row {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: row;
+}
+
+.small-btn {
+  height: 84rpx;
+  border-radius: 42rpx;
+  padding: 0 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-save {
+  background-color: #2563eb;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+}
+
+.small-btn-text {
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.health-status {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #16a34a;
+}
+</style>

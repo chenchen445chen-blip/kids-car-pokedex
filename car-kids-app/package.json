@@ -1,0 +1,15 @@
+{
+  "name": "car-kids-app",
+  "version": "1.2.0",
+  "description": "儿童汽车认知与拍照识别 App (uni-app x)",
+  "private": true,
+  "scripts": {
+    "dev:h5": "uni",
+    "build:h5": "uni build",
+    "dev:app-android": "uni -p app-android"
+  },
+  "dependencies": {
+    "vue": "^3.4.21"
+  }
+}
+

@@ -1,0 +1,38 @@
+{
+	"name": "儿童汽车认知",
+	"appid": "",
+	"description": "面向 3—5 岁儿童的真实汽车认知与拍照识别 App",
+	"versionName": "1.2.0",
+	"versionCode": 10200,
+	"uni-app-x": {
+		"compilerVersion": "4.25",
+		"vapor": true,
+		"styleIsolationVersion": "2",
+		"vapor-render-target": "bytecode",
+		"vapor-default-script-lang": "uts"
+	},
+	"app-android": {
+		"distribute": {
+			"modules": {},
+			"icons": {}
+		}
+	},
+	"h5": {
+		"title": "儿童汽车认知",
+		"router": {
+			"mode": "hash"
+		}
+	},
+	"web": {
+		"router": {
+			"mode": ""
+		}
+	},
+	"mp-weixin": {
+		"appid": "",
+		"setting": {
+			"urlCheck": false
+		},
+		"usingComponents": true
+	}
+}

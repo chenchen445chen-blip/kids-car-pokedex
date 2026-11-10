@@ -1,0 +1,469 @@
+<template>
+  <view class="app-screen random-result-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（返回按钮 + 标题） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">随机查看</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <!-- 上下滑整页翻页随机看车 -->
+    <swiper
+      v-if="feedList.length > 0"
+      class="feed-swiper"
+      :vertical="true"
+      :circular="true"
+      :current="currentIndex"
+      @change="onSwiperChange"
+    >
+      <swiper-item
+        v-for="(item, idx) in feedList"
+        :key="idx"
+        class="feed-swiper-item"
+      >
+        <view class="slide-card-wrapper">
+          <view class="result-style-card">
+            <!-- 上方：车辆多图横向轮播展示（支持左右滑动切换正/侧面照，底部圆点联动） -->
+            <view class="car-photo-box">
+              <swiper
+                class="car-photo-swiper"
+                :circular="getGalleryCount(item) > 1"
+                :current="getActivePhotoIndex(idx)"
+                @change="onPhotoSwiperChange($event, idx)"
+              >
+                <swiper-item
+                  v-for="(imgObj, gIdx) in getSlidePhotos(item)"
+                  :key="gIdx"
+                  class="car-photo-swiper-item"
+                >
+                  <image
+                    :src="resolveImageUrl(imgObj.getString('url'))"
+                    mode="aspectFit"
+                    class="car-photo-img"
+                  />
+                </swiper-item>
+              </swiper>
+              <!-- 多图圆点指示器 -->
+              <view v-if="getGalleryCount(item) > 1" class="photo-dots-row">
+                <view
+                  v-for="(_, gIdx) in getGalleryArray(item)"
+                  :key="gIdx"
+                  class="photo-dot"
+                  :class="{ 'photo-dot-active': getActivePhotoIndex(idx) == gIdx }"
+                ></view>
+              </view>
+            </view>
+
+            <!-- 中间：大车标图标 + 品牌名称与车系名称（还原 03-识别结果.png 布局） -->
+            <view class="brand-hero-row">
+              <view class="brand-big-logo-wrap">
+                <image
+                  v-if="getBrandLogoUrl(item) != ''"
+                  :src="getBrandLogoUrl(item)"
+                  mode="aspectFit"
+                  class="brand-big-logo"
+                />
+                <text v-else class="brand-logo-fallback">🚗</text>
+              </view>
+              <view class="brand-text-col">
+                <text class="brand-title-text">
+                  {{ getBrandNameText(item) }}
+                </text>
+                <text class="series-subtitle-text">
+                  {{ getSeriesDisplayName(item) }}
+                </text>
+              </view>
+            </view>
+
+            <!-- 车辆分类胶囊标签（如：家用车 · 轿车） -->
+            <view class="category-pill-box">
+              <text class="category-pill-label">
+                {{ getCategoryDisplayText(item) }}
+              </text>
+            </view>
+
+            <!-- 下方：灯泡大图标 + 儿童认知文案卡片（去掉底部「查看更多」按钮） -->
+            <view class="intro-bulb-box">
+              <text class="intro-bulb-icon">💡</text>
+              <text class="intro-bulb-text">
+                {{ item.getString('introduction_child') ?? '这是一辆道路上常见的真实汽车。' }}
+              </text>
+            </view>
+          </view>
+        </view>
+      </swiper-item>
+    </swiper>
+
+    <!-- 加载中状态 -->
+    <view v-else class="loading-box">
+      <text class="loading-emoji">🚗</text>
+      <text class="loading-text">正在准备汽车图鉴...</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue';
+import { fetchRandomVehicles } from '../../api/catalog.uts';
+import { resolveImageUrl, saveRecentVehicle } from '../../utils/request.uts';
+
+const feedList = ref<Array<UTSJSONObject>>([]);
+const currentIndex = ref<number>(0);
+const isFetching = ref<boolean>(false);
+const photoIndexMap = ref<UTSJSONObject>({});
+
+function getBrandLogoUrl(item: UTSJSONObject): string {
+  const brandObj = item.getJSON('brand');
+  return resolveImageUrl(brandObj?.getString('logo_url') ?? null);
+}
+
+function getBrandNameText(item: UTSJSONObject): string {
+  const brandZh = item.getString('brand_name_zh') ?? '';
+  if (brandZh != '') {
+    return brandZh;
+  }
+  const brandObj = item.getJSON('brand');
+  return brandObj?.getString('name_zh') ?? '知名品牌';
+}
+
+function getSeriesDisplayName(item: UTSJSONObject): string {
+  const seriesZh = item.getString('series_name_zh') ?? '';
+  if (seriesZh != '') {
+    return seriesZh;
+  }
+  const brandZh = getBrandNameText(item);
+  const modelZh = item.getString('model_name_zh') ?? item.getString('model_name') ?? '';
+  if (brandZh != '' && modelZh.startsWith(brandZh)) {
+    const stripped = modelZh.slice(brandZh.length).trim();
+    if (stripped != '') {
+      return stripped;
+    }
+  }
+  return modelZh;
+}
+
+function getCategoryDisplayText(item: UTSJSONObject): string {
+  const catLabel = item.getString('category_label') ?? '家用车';
+  const bodyStyle = item.getString('body_style') ?? '';
+  if (bodyStyle != '' && bodyStyle != '汽车' && bodyStyle != '常见车系' && !catLabel.includes(bodyStyle)) {
+    return `${catLabel} · ${bodyStyle}`;
+  }
+  return catLabel;
+}
+
+function getGalleryArray(item: UTSJSONObject): Array<UTSJSONObject> {
+  return item.getArray<UTSJSONObject>('images') ?? ([] as Array<UTSJSONObject>);
+}
+
+function getSlidePhotos(item: UTSJSONObject): Array<UTSJSONObject> {
+  const arr = getGalleryArray(item);
+  if (arr.length > 0) {
+    return arr;
+  }
+  const fallback: UTSJSONObject = {
+    url: item.getString('cover_image_url') ?? '',
+  };
+  return [fallback];
+}
+
+function getGalleryCount(item: UTSJSONObject): number {
+  const arr = getGalleryArray(item);
+  return arr.length;
+}
+
+function getActivePhotoIndex(slideIdx: number): number {
+  const key = `${slideIdx}`;
+  return photoIndexMap.value.getNumber(key) ?? 0;
+}
+
+function selectSlidePhoto(slideIdx: number, photoIdx: number) {
+  const nextMap: UTSJSONObject = {};
+  const oldVal = photoIndexMap.value;
+  oldVal.toMap().forEach((v, k) => {
+    nextMap.set(k, v);
+  });
+  nextMap.set(`${slideIdx}`, photoIdx);
+  photoIndexMap.value = nextMap;
+}
+
+function onPhotoSwiperChange(e: UniSwiperChangeEvent, slideIdx: number) {
+  selectSlidePhoto(slideIdx, e.detail.current);
+}
+
+function appendRandomBatch(reset: boolean) {
+  if (isFetching.value) return;
+  isFetching.value = true;
+  fetchRandomVehicles({ limit: 20 })
+    .then((res: UTSJSONObject) => {
+      const items = res.getArray<UTSJSONObject>('items') ?? ([] as Array<UTSJSONObject>);
+      if (reset) {
+        currentIndex.value = 0;
+        photoIndexMap.value = {};
+        feedList.value = items;
+      } else {
+        const merged: Array<UTSJSONObject> = [];
+        for (let i = 0; i < feedList.value.length; i++) {
+          merged.push(feedList.value[i]);
+        }
+        for (let j = 0; j < items.length; j++) {
+          merged.push(items[j]);
+        }
+        feedList.value = merged;
+      }
+      if (feedList.value.length > 0 && reset) {
+        saveRecentVehicle(feedList.value[0]);
+      }
+      isFetching.value = false;
+    })
+    .catch(() => {
+      isFetching.value = false;
+    });
+}
+
+function onSwiperChange(e: UniSwiperChangeEvent) {
+  const idx = e.detail.current;
+  currentIndex.value = idx;
+  if (idx >= 0 && idx < feedList.value.length) {
+    saveRecentVehicle(feedList.value[idx]);
+  }
+  if (idx >= feedList.value.length - 4) {
+    appendRandomBatch(false);
+  }
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+onLoad(() => {
+  appendRandomBatch(true);
+});
+
+onShareAppMessage(() => {
+  return {
+    title: '儿童汽车认知 - 随机看车识车',
+    path: '/pages/catalog/random-feed',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: '儿童汽车认知 - 随机看车识车',
+  };
+});
+</script>
+
+<style scoped>
+.random-result-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-swiper {
+  flex: 1;
+  width: 100%;
+}
+
+.feed-swiper-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-card-wrapper {
+  flex: 1;
+  width: 100%;
+  padding: 24rpx 32rpx 44rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-style-card {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.94);
+  border-radius: 44rpx;
+  padding: 28rpx 32rpx 36rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #e2e8f0;
+}
+
+.car-photo-box {
+  width: 100%;
+  height: 460rpx;
+  background-color: #ffffff;
+  border-radius: 32rpx;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #eef2f6;
+}
+
+.car-photo-swiper {
+  width: 100%;
+  height: 100%;
+}
+
+.car-photo-swiper-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.car-photo-img {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-dots-row {
+  position: absolute;
+  bottom: 18rpx;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+  background-color: #cbd5e1;
+  margin-left: 8rpx;
+  margin-right: 8rpx;
+}
+
+.photo-dot-active {
+  width: 32rpx;
+  background-color: #2563eb;
+}
+
+.brand-hero-row {
+  width: 100%;
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-big-logo-wrap {
+  width: 156rpx;
+  height: 156rpx;
+  border-radius: 78rpx;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 28rpx;
+}
+
+.brand-big-logo {
+  width: 144rpx;
+  height: 144rpx;
+}
+
+.brand-logo-fallback {
+  font-size: 80rpx;
+}
+
+.brand-text-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.brand-title-text {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 64rpx;
+}
+
+.series-subtitle-text {
+  margin-top: 6rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 48rpx;
+}
+
+.category-pill-box {
+  margin-top: 20rpx;
+  background-color: #dbeafe;
+  padding: 14rpx 48rpx;
+  border-radius: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.category-pill-label {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.intro-bulb-box {
+  width: 100%;
+  margin-top: 24rpx;
+  background-color: #e0effe;
+  border-radius: 32rpx;
+  padding: 32rpx 32rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.intro-bulb-icon {
+  font-size: 64rpx;
+  margin-right: 24rpx;
+}
+
+.intro-bulb-text {
+  flex: 1;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 52rpx;
+}
+
+.loading-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-emoji {
+  font-size: 96rpx;
+  margin-bottom: 20rpx;
+}
+
+.loading-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #475569;
+}
+</style>

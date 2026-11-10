@@ -1,0 +1,549 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿上排第4张 & 下排第1张） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">{{ activeTab == 'type' ? '汽车图鉴' : '按品牌找车' }}</text>
+        <view class="nav-home-btn" @click="goHome">
+          <text class="nav-icon-text">🏠</text>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <!-- 顶部双维度切换卡：按类型 / 按品牌（BRAND-001） -->
+      <view class="dimension-tabs">
+        <view
+          class="dim-tab-item dim-tab-left"
+          :class="{ 'dim-tab-active': activeTab == 'type' }"
+          @click="switchTab('type')"
+        >
+          <image
+            :src="activeTab == 'type' ? '/static/icons/tab_type_white.png' : '/static/icons/tab_type_black.png'"
+            mode="aspectFit"
+            class="dim-tab-icon-img"
+          />
+          <text class="dim-tab-label" :class="{ 'dim-tab-label-active': activeTab == 'type' }">
+            按类型
+          </text>
+        </view>
+
+        <view
+          class="dim-tab-item"
+          :class="{ 'dim-tab-active': activeTab == 'brand' }"
+          @click="switchTab('brand')"
+        >
+          <image
+            :src="activeTab == 'brand' ? '/static/icons/tab_brand_white.png' : '/static/icons/tab_brand_black.png'"
+            mode="aspectFit"
+            class="dim-tab-icon-img"
+          />
+          <text class="dim-tab-label" :class="{ 'dim-tab-label-active': activeTab == 'brand' }">
+            按品牌
+          </text>
+        </view>
+      </view>
+
+      <!-- 维度 A：按车辆类型浏览（含「随机查看」入口 + 家用车、越野车、工程车、货运车辆、公共交通、特种车辆、摩托及其他） -->
+      <view v-if="activeTab == 'type'" class="category-list">
+        <!-- 新增分类入口：随机查看 + 查看详情按钮 -->
+        <view class="category-row-card random-entry-card" @click="openRandomFeed">
+          <view class="cat-illust-box random-illust-box">
+            <text class="cat-emoji">🎲</text>
+          </view>
+          <view class="cat-info">
+            <text class="cat-name random-cat-name">随机查看</text>
+            <text class="cat-count random-cat-sub">上下滑翻页 · 全尺寸高清大图</text>
+          </view>
+          <view class="random-detail-pill">
+            <text class="random-detail-pill-text">查看详情 ›</text>
+          </view>
+        </view>
+
+        <view
+          v-for="(cat, idx) in categoryTree"
+          :key="idx"
+          class="category-row-card"
+          @click="openCategory(cat)"
+        >
+          <view class="cat-illust-box cat-icon-wrap">
+            <image
+              v-if="getCategoryIcon(cat.getString('code') ?? '') != ''"
+              :src="getCategoryIcon(cat.getString('code') ?? '')"
+              mode="aspectFit"
+              class="cat-icon-img"
+            />
+            <text v-else class="cat-emoji">{{ getCategoryEmoji(cat.getString('code') ?? '') }}</text>
+          </view>
+          <view class="cat-info">
+            <text class="cat-name">{{ cat.getString('name') ?? '' }}</text>
+            <text v-if="(cat.getNumber('vehicle_count') ?? 0) > 0" class="cat-count">
+              已收录 {{ cat.getNumber('vehicle_count') ?? 0 }} 款
+            </text>
+          </view>
+          <text class="cat-arrow">›</text>
+        </view>
+      </view>
+
+      <!-- 维度 B：按品牌浏览（还原设计稿下排第1张：九宫格品牌卡片 + 查看更多品牌） -->
+      <view v-else class="brand-section">
+        <!-- 品牌分组快捷筛选 -->
+        <scroll-view direction="horizontal" class="group-scroll">
+          <view class="group-row">
+            <view
+              v-for="(grp, gIdx) in brandGroups"
+              :key="gIdx"
+              class="group-pill"
+              :class="{ 'group-pill-active': activeBrandGroup == (grp.getString('value') ?? '') }"
+              @click="selectBrandGroup(grp.getString('value') ?? '')"
+            >
+              <text
+                class="group-pill-text"
+                :class="{ 'group-pill-text-active': activeBrandGroup == (grp.getString('value') ?? '') }"
+              >
+                {{ grp.getString('label') ?? '' }}
+              </text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <!-- 九宫格品牌列表（使用标准 flex-wrap 替代 grid，兼容 uni-app x 原生渲染） -->
+        <view class="brand-grid">
+          <view
+            v-for="(brand, bIdx) in displayedBrands"
+            :key="bIdx"
+            class="brand-grid-card"
+            @click="openBrandDetail(brand)"
+          >
+            <view class="brand-badge-box">
+              <image
+                v-if="getImgUrl(brand.getString('logo_url')) != ''"
+                :src="getImgUrl(brand.getString('logo_url'))"
+                mode="aspectFit"
+                class="brand-logo-img"
+              />
+              <text
+                v-else
+                class="brand-badge-mark"
+                :style="{ color: getBrandAccentColor(brand.getString('name_zh') ?? '') }"
+              >
+                {{ getBrandMonogram(brand.getString('name') ?? '', brand.getString('name_zh') ?? '') }}
+              </text>
+            </view>
+            <text class="brand-card-name">{{ brand.getString('name_zh') ?? '' }}</text>
+          </view>
+        </view>
+
+        <!-- 展开查看更多品牌（还原设计稿底部「查看更多品牌 v」） -->
+        <view
+          v-if="brandList.length > 9"
+          class="more-brands-btn"
+          @click="toggleShowAllBrands"
+        >
+          <text class="more-brands-text">
+            {{ showAllBrands ? '收起部分品牌 ⌃' : '查看更多品牌 ⌄' }}
+          </text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { computed, ref } from 'vue';
+import { fetchBrands, fetchCategories } from '../../api/catalog.uts';
+import { resolveImageUrl } from '../../utils/request.uts';
+
+const activeTab = ref<string>('type');
+const categoryTree = ref<Array<UTSJSONObject>>([]);
+const brandList = ref<Array<UTSJSONObject>>([]);
+const activeBrandGroup = ref<string>('');
+const showAllBrands = ref<boolean>(false);
+
+function getImgUrl(url: string | null): string {
+  return resolveImageUrl(url);
+}
+
+const brandGroups: Array<UTSJSONObject> = [
+  { label: '全部品牌', value: '' },
+  { label: '中国自主', value: 'china_independent' },
+  { label: '新能源/新势力', value: 'china_nev' },
+  { label: '合资常见', value: 'joint_venture' },
+  { label: '豪华进口', value: 'luxury_import' },
+  { label: '工程机械', value: 'construction_machinery' },
+];
+
+const displayedBrands = computed((): Array<UTSJSONObject> => {
+  if (showAllBrands.value) {
+    return brandList.value;
+  }
+  return brandList.value.slice(0, 9);
+});
+
+function loadCatalogData() {
+  fetchCategories({ tree: true, include_count: true }).then((catRes: UTSJSONObject) => {
+    categoryTree.value = catRes.getArray<UTSJSONObject>('items') ?? ([] as Array<UTSJSONObject>);
+  });
+  fetchBrands({ page: 1, page_size: 50 }).then((brandRes: UTSJSONObject) => {
+    brandList.value = brandRes.getArray<UTSJSONObject>('items') ?? ([] as Array<UTSJSONObject>);
+  });
+}
+
+function switchTab(tab: string) {
+  activeTab.value = tab;
+}
+
+function toggleShowAllBrands() {
+  showAllBrands.value = !showAllBrands.value;
+}
+
+onLoad((query: OnLoadOptions) => {
+  if (query['tab'] == 'brand') {
+    activeTab.value = 'brand';
+  }
+  loadCatalogData();
+});
+
+function selectBrandGroup(grpValue: string) {
+  activeBrandGroup.value = grpValue;
+  const params: UTSJSONObject = grpValue != '' ? { brand_group: grpValue } : {};
+  fetchBrands(params).then((res: UTSJSONObject) => {
+    brandList.value = res.getArray<UTSJSONObject>('items') ?? ([] as Array<UTSJSONObject>);
+  });
+}
+
+function getCategoryIcon(code: string): string {
+  if (
+    code == 'family_car' ||
+    code == 'off_road' ||
+    code == 'construction' ||
+    code == 'freight' ||
+    code == 'public_transit' ||
+    code == 'special_purpose' ||
+    code == 'motorcycle_other'
+  ) {
+    return `/static/category-icons/${code}.png`;
+  }
+  return '';
+}
+
+function getCategoryEmoji(code: string): string {
+  if (code == 'family_car') return '🚙';
+  if (code == 'off_road') return '🛻';
+  if (code == 'construction') return '🏗️';
+  if (code == 'freight') return '🚚';
+  if (code == 'public_transit') return '🚌';
+  if (code == 'special_purpose') return '🚒';
+  if (code == 'motorcycle_other') return '🏍️';
+  return '🚗';
+}
+
+function getBrandMonogram(name: string, nameZh: string): string {
+  if (nameZh == '比亚迪') return 'BYD';
+  if (nameZh == '吉利') return 'GEELY';
+  if (nameZh == '大众') return 'VW';
+  if (nameZh == '丰田') return 'TOYOTA';
+  if (nameZh == '本田') return 'H';
+  if (nameZh == '奔驰') return '✦';
+  if (nameZh == '宝马') return 'BMW';
+  if (nameZh == '奥迪') return 'OOOO';
+  if (nameZh == '特斯拉') return 'T';
+  return name.length > 0 ? name.slice(0, 4).toUpperCase() : 'CAR';
+}
+
+function getBrandAccentColor(nameZh: string): string {
+  if (nameZh == '比亚迪' || nameZh == '丰田' || nameZh == '特斯拉') return '#dc2626';
+  if (nameZh == '吉利' || nameZh == '大众' || nameZh == '宝马') return '#1d4ed8';
+  return '#334155';
+}
+
+function openRandomFeed() {
+  uni.navigateTo({
+    url: '/pages/catalog/random-feed',
+  });
+}
+
+function openCategory(cat: UTSJSONObject) {
+  const cid = cat.getNumber('id') ?? 0;
+  const cname = encodeURIComponent(cat.getString('name') ?? '');
+  uni.navigateTo({
+    url: `/pages/catalog/category-vehicles?id=${cid}&name=${cname}`,
+  });
+}
+
+function openBrandDetail(brand: UTSJSONObject) {
+  const bid = brand.getNumber('id') ?? 0;
+  uni.navigateTo({
+    url: `/pages/brand/detail?id=${bid}`,
+  });
+}
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+function goHome() {
+  uni.reLaunch({ url: '/pages/index/index' });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: '儿童汽车认知 - 汽车图鉴大全',
+    path: '/pages/catalog/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: '儿童汽车认知 - 汽车图鉴大全',
+  };
+});
+</script>
+
+<style scoped>
+.dimension-tabs {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 28rpx;
+}
+
+.dim-tab-item {
+  flex: 1;
+  height: 132rpx;
+  border-radius: 32rpx;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dim-tab-left {
+  margin-right: 24rpx;
+}
+
+.dim-tab-active {
+  background-image: linear-gradient(to bottom, #3b9eff, #1d7dfa);
+}
+
+.dim-tab-icon-img {
+  width: 72rpx;
+  height: 52rpx;
+}
+
+.dim-tab-label {
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.dim-tab-label-active {
+  color: #ffffff;
+}
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.category-row-card {
+  height: 132rpx;
+  background-color: #ffffff;
+  border-radius: 28rpx;
+  padding: 0 32rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.random-entry-card {
+  background-image: linear-gradient(to right, #eff6ff, #dbeafe);
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: #60a5fa;
+}
+
+.random-illust-box {
+  background-color: #2563eb;
+}
+
+.random-cat-name {
+  color: #1e3a8a;
+}
+
+.random-cat-sub {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.random-detail-pill {
+  height: 60rpx;
+  padding: 0 24rpx;
+  border-radius: 30rpx;
+  background-image: linear-gradient(to bottom, #3b9eff, #1d7dfa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.random-detail-pill-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.cat-illust-box {
+  width: 116rpx;
+  height: 92rpx;
+  border-radius: 20rpx;
+  background-color: #f0f7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 28rpx;
+}
+
+.cat-icon-wrap {
+  width: 176rpx;
+  height: 96rpx;
+  background-color: transparent;
+  margin-right: 24rpx;
+}
+
+.cat-icon-img {
+  width: 176rpx;
+  height: 96rpx;
+}
+
+.cat-emoji {
+  font-size: 60rpx;
+}
+
+.cat-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cat-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cat-count {
+  font-size: 24rpx;
+  color: #64748b;
+  margin-top: 4rpx;
+}
+
+.cat-arrow {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.group-scroll {
+  width: 100%;
+  margin-bottom: 24rpx;
+  display: flex;
+  flex-direction: row;
+}
+
+.group-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.group-pill {
+  padding: 12rpx 28rpx;
+  border-radius: 30rpx;
+  background-color: rgba(255, 255, 255, 0.85);
+  margin-right: 16rpx;
+}
+
+.group-pill-active {
+  background-color: #1d7dfa;
+}
+
+.group-pill-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #334155;
+}
+
+.group-pill-text-active {
+  color: #ffffff;
+}
+
+.brand-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.brand-grid-card {
+  width: 31%;
+  background-color: #ffffff;
+  border-radius: 28rpx;
+  padding: 28rpx 12rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-badge-box {
+  width: 116rpx;
+  height: 116rpx;
+  border-radius: 58rpx;
+  background-color: #ffffff;
+  border-width: 3rpx;
+  border-style: solid;
+  border-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  padding: 10rpx;
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+}
+
+.brand-badge-mark {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.brand-card-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.more-brands-btn {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.more-brands-text {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+</style>

@@ -1,0 +1,18 @@
+"""数据库实体常量与状态枚举定义。"""
+
+REVIEW_STATUS_PENDING = "pending_review"
+REVIEW_STATUS_APPROVED = "approved"
+REVIEW_STATUS_REJECTED = "rejected"
+
+IMAGE_TYPE_REAL = "real_photo"
+IMAGE_TYPE_SYNTHETIC = "synthetic_model"
+IMAGE_TYPE_ILLUSTRATION = "illustration"
+IMAGE_TYPE_LOGO = "logo"
+IMAGE_TYPE_PLACEHOLDER = "placeholder"
+
+RECOGNITION_STATUS_MATCHED = "matched"
+RECOGNITION_STATUS_PENDING_REVIEW = "pending_review"
+RECOGNITION_STATUS_CANDIDATES = "candidates"
+RECOGNITION_STATUS_UNRECOGNIZED = "unrecognized"
+RECOGNITION_STATUS_PROVIDER_ERROR = "provider_error"
+

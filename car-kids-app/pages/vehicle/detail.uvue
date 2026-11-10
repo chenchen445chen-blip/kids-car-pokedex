@@ -1,0 +1,267 @@
+<template>
+  <view class="app-screen">
+    <!-- 顶部状态栏安全区 + 导航栏（还原设计稿下排第4张：2024款 奔驰 E级 具体车型详情页） -->
+    <view class="top-header">
+      <view class="status-bar-space"></view>
+      <view class="nav-bar">
+        <view class="nav-back-btn" @click="goBack">
+          <text class="nav-icon-text">‹</text>
+        </view>
+        <text class="nav-title">{{ modelNameZh }}</text>
+        <view class="nav-placeholder"></view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y="true">
+      <view class="card-box detail-main-card">
+        <!-- 蓝色年款胶囊标签（如：2024款） -->
+        <view v-if="modelYear > 0" class="year-badge">
+          <text class="year-badge-text">{{ modelYear }}款</text>
+        </view>
+
+        <!-- 具体车型大标题（如：奔驰 E级） -->
+        <text class="vehicle-big-title">{{ modelNameZh }}</text>
+
+        <view class="divider-line"></view>
+
+        <!-- 三行图标属性列表（还原设计稿：🚗 轿车 / 🛞 奔驰 / 🏠 家用车） -->
+        <view class="attr-list">
+          <view class="attr-row">
+            <text class="attr-icon">🚗</text>
+            <text class="attr-value">{{ bodyStyle }}</text>
+          </view>
+          <view class="attr-row">
+            <image
+              v-if="brandLogoUrl != ''"
+              :src="brandLogoUrl"
+              mode="aspectFit"
+              class="attr-brand-logo"
+            />
+            <text v-else class="attr-icon">🛞</text>
+            <text class="attr-value">{{ brandNameZh }}</text>
+          </view>
+          <view class="attr-row">
+            <text class="attr-icon">🏠</text>
+            <text class="attr-value">{{ primaryCategoryText }}</text>
+          </view>
+        </view>
+
+        <!-- 主展示图片 + 图片类型标识（按图片尺寸等比缩放留白，保证完整宽高显示） -->
+        <view class="hero-photo-wrap">
+          <image
+            :src="coverImageUrl"
+            mode="aspectFit"
+            class="hero-photo"
+          />
+          <view
+            class="photo-type-tag"
+            :class="{ 'photo-type-model': isModelImage }"
+          >
+            <text class="photo-type-text">
+              {{ isModelImage ? '仿真模型' : '真实实拍' }}
+            </text>
+          </view>
+        </view>
+
+        <!-- 灯泡儿童版知识介绍卡片（如：💡 这是一款豪华轿车，适合家庭出行。） -->
+        <view class="tip-bulb-card" style="width: 100%; margin-top: 28rpx">
+          <text class="tip-bulb-icon">💡</text>
+          <text class="tip-bulb-text">{{ introChild }}</text>
+        </view>
+
+        <!-- 外观识别特征补充说明 -->
+        <view v-if="recognitionFeatures != ''" class="feature-card">
+          <text class="feature-label">👀 怎么认出它：</text>
+          <text class="feature-content">{{ recognitionFeatures }}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue';
+import { fetchVehicleDetail } from '../../api/catalog.uts';
+import { resolveImageUrl, saveRecentVehicle } from '../../utils/request.uts';
+
+const modelNameZh = ref<string>('奔驰 E级');
+const modelYear = ref<number>(2024);
+const bodyStyle = ref<string>('轿车');
+const brandNameZh = ref<string>('奔驰');
+const brandLogoUrl = ref<string>('');
+const primaryCategoryText = ref<string>('家用车');
+const coverImageUrl = ref<string>('');
+const isModelImage = ref<boolean>(false);
+const introChild = ref<string>('这是一款豪华轿车，适合家庭出行。');
+const recognitionFeatures = ref<string>('');
+
+onLoad((query: OnLoadOptions) => {
+  const id = parseInt(query['id'] ?? '0');
+  if (id <= 0) return;
+  fetchVehicleDetail(id).then((detail: UTSJSONObject) => {
+    modelNameZh.value = detail.getString('model_name_zh') ?? detail.getString('model_name') ?? '车型详情';
+    modelYear.value = detail.getNumber('model_year') ?? 2024;
+    bodyStyle.value = detail.getString('body_style') ?? '轿车';
+    const brandObj = detail.getJSON('brand');
+    brandNameZh.value = brandObj?.getString('name_zh') ?? '知名品牌';
+    brandLogoUrl.value = resolveImageUrl(brandObj?.getString('logo_url') ?? null);
+
+    const catNames = detail.getArray<string>('category_names');
+    if (catNames != null && catNames.length > 0) {
+      primaryCategoryText.value = catNames[0];
+    }
+
+    coverImageUrl.value = resolveImageUrl(detail.getString('cover_image_url'));
+    isModelImage.value = detail.getBoolean('is_model_image') ?? false;
+    introChild.value = detail.getString('introduction_child') ?? '这是一款适合日常出行的汽车。';
+    recognitionFeatures.value = detail.getString('recognition_features') ?? '';
+
+    saveRecentVehicle(detail);
+  });
+});
+
+function goBack() {
+  uni.navigateBack({ delta: 1 });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: `儿童汽车认知 - ${modelNameZh.value}`,
+    path: '/pages/catalog/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: `儿童汽车认知 - ${modelNameZh.value}`,
+  };
+});
+</script>
+
+<style scoped>
+.detail-main-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.year-badge {
+  background-image: linear-gradient(to bottom, #38a3ff, #1d7dfa);
+  padding: 8rpx 28rpx;
+  border-radius: 28rpx;
+}
+
+.year-badge-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.vehicle-big-title {
+  margin-top: 18rpx;
+  font-size: 50rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.divider-line {
+  width: 100%;
+  height: 2rpx;
+  background-color: #e2e8f0;
+  margin-top: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.attr-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.attr-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 18rpx;
+}
+
+.attr-icon {
+  font-size: 36rpx;
+  margin-right: 20rpx;
+}
+
+.attr-brand-logo {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 24rpx;
+  background-color: #f8fafc;
+  margin-right: 16rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #e2e8f0;
+}
+
+.attr-value {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.hero-photo-wrap {
+  width: 100%;
+  height: 440rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  position: relative;
+  margin-top: 16rpx;
+  background-color: #f8fafc;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #e2e8f0;
+}
+
+.hero-photo {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-type-tag {
+  position: absolute;
+  bottom: 16rpx;
+  right: 16rpx;
+  background-color: rgba(15, 23, 42, 0.72);
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+}
+
+.photo-type-model {
+  background-color: #d97706;
+}
+
+.photo-type-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.feature-card {
+  width: 100%;
+  margin-top: 24rpx;
+  background-color: #f8fafc;
+  border-radius: 24rpx;
+  padding: 22rpx 26rpx;
+}
+
+.feature-label {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #334155;
+}
+
+.feature-content {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  color: #475569;
+  line-height: 42rpx;
+}
+</style>

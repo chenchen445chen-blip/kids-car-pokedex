@@ -1,0 +1,88 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "儿童汽车认知",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/recognition/camera",
+      "style": {
+        "navigationBarTitleText": "拍照识车",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/recognition/result",
+      "style": {
+        "navigationBarTitleText": "识别结果",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/recognition/pending",
+      "style": {
+        "navigationBarTitleText": "该车型正在审核中",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/catalog/index",
+      "style": {
+        "navigationBarTitleText": "汽车图鉴",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/catalog/random-feed",
+      "style": {
+        "navigationBarTitleText": "随机查看详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/catalog/category-vehicles",
+      "style": {
+        "navigationBarTitleText": "分类车型",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/brand/detail",
+      "style": {
+        "navigationBarTitleText": "品牌详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/series/detail",
+      "style": {
+        "navigationBarTitleText": "车系详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/vehicle/detail",
+      "style": {
+        "navigationBarTitleText": "车型详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/parent/settings",
+      "style": {
+        "navigationBarTitleText": "家长设置",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "儿童汽车认知",
+    "navigationBarBackgroundColor": "#EBF4FF",
+    "backgroundColor": "#EBF4FF"
+  }
+}
+

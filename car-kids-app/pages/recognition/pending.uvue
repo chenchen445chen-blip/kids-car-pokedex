@@ -1,0 +1,113 @@
+<template>
+  <view class="pending-screen">
+    <view class="status-bar-space"></view>
+    <!-- 还原设计稿右下第10张图：暖黄柔和背景 + 卡通挖掘机插画 + 该车型正在审核中 -->
+    <view class="pending-body">
+      <view class="illustration-stage">
+        <text class="star">⭐</text>
+        <view class="excavator-circle">
+          <text class="excavator-emoji">🏗️</text>
+          <text class="tractor-emoji">🚜</text>
+        </view>
+        <text class="star">✨</text>
+      </view>
+
+      <text class="pending-title">该车型正在审核中</text>
+      <text class="pending-subtitle">我们正在完善相关信息，</text>
+      <text class="pending-subtitle">请稍后再来查看。</text>
+
+      <view class="primary-pill-btn back-catalog-btn" @click="goCatalog">
+        <text class="primary-pill-btn-text">返回图鉴</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+function goCatalog() {
+  uni.redirectTo({ url: '/pages/catalog/index' });
+}
+
+onShareAppMessage(() => {
+  return {
+    title: '儿童汽车认知乐园',
+    path: '/pages/index/index',
+  };
+});
+
+onShareTimeline(() => {
+  return {
+    title: '儿童汽车认知乐园',
+  };
+});
+</script>
+
+<style scoped>
+.pending-screen {
+  flex: 1;
+  background-image: linear-gradient(to bottom, #fffbeb, #fef3c7);
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+}
+
+.illustration-stage {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 48rpx;
+}
+
+.excavator-circle {
+  width: 260rpx;
+  height: 260rpx;
+  border-radius: 130rpx;
+  background-color: #fde68a;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.excavator-emoji {
+  font-size: 104rpx;
+}
+
+.tractor-emoji {
+  font-size: 88rpx;
+}
+
+.star {
+  font-size: 48rpx;
+  margin-left: 20rpx;
+  margin-right: 20rpx;
+}
+
+.pending-title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #d97706;
+  margin-bottom: 24rpx;
+}
+
+.pending-subtitle {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #475569;
+  line-height: 50rpx;
+}
+
+.back-catalog-btn {
+  width: 82%;
+  margin-top: 72rpx;
+}
+</style>
